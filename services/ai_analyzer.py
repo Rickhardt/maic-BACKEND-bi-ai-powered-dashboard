@@ -6,12 +6,12 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
-# Intentar importar OpenAI (opcional)
+# Intentar importar Anthropic (Claude API)
 try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
+    from anthropic import Anthropic
+    ANTHROPIC_AVAILABLE = True
 except ImportError:
-    OPENAI_AVAILABLE = False
+    ANTHROPIC_AVAILABLE = False
 
 
 def analyze_dataframe_mock(schema: Dict[str, Any], summary: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -106,9 +106,9 @@ def analyze_dataframe_mock(schema: Dict[str, Any], summary: Dict[str, Any]) -> L
     return suggestions[:5]
 
 
-def analyze_dataframe_openai(schema: Dict[str, Any], summary: Dict[str, Any]) -> List[Dict[str, Any]]:
+def analyze_dataframe_claude(schema: Dict[str, Any], summary: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
-    Versión real del analizador que usa OpenAI API.
+    Versión real del analizador que usa Claude API (Anthropic).
     
     Args:
         schema: Información del esquema del DataFrame
@@ -117,15 +117,15 @@ def analyze_dataframe_openai(schema: Dict[str, Any], summary: Dict[str, Any]) ->
     Returns:
         Lista de sugerencias de visualización
     """
-    if not OPENAI_AVAILABLE:
+    if not ANTHROPIC_AVAILABLE:
         return analyze_dataframe_mock(schema, summary)
     
-    api_key = os.getenv('OPENAI_API_KEY')
+    api_key = os.getenv('AI_API_KEY')
     if not api_key:
-        print("Warning: OPENAI_API_KEY not found, using mock analyzer")
+        print("Warning: AI_API_KEY not found, using mock analyzer")
         return analyze_dataframe_mock(schema, summary)
     
-    client = OpenAI(api_key=api_key)
+    client = Anthropic(api_key=api_key)
     
     prompt = f"""Eres un analista de datos experto. Analiza la siguiente información de un DataFrame y sugiere 3-5 visualizaciones específicas y útiles.
 
@@ -159,17 +159,17 @@ Ejemplo de formato:
 Responde solo con el JSON, sin texto adicional:"""
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "Eres un experto analista de datos que genera sugerencias de visualización en formato JSON."},
-                {"role": "user", "content": prompt}
-            ],
+        message = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=1500,
             temperature=0.7,
-            max_tokens=1500
+            system="Eres un experto analista de datos que genera sugerencias de visualización en formato JSON.",
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
         )
         
-        content = response.choices[0].message.content.strip()
+        content = message.content[0].text.strip()
         # Limpiar el contenido si tiene markdown code blocks
         if content.startswith('```json'):
             content = content[7:]
@@ -183,24 +183,24 @@ Responde solo con el JSON, sin texto adicional:"""
         return suggestions if isinstance(suggestions, list) else []
     
     except Exception as e:
-        print(f"Error calling OpenAI API: {e}")
+        print(f"Error calling Claude API: {e}")
         print("Falling back to mock analyzer")
         return analyze_dataframe_mock(schema, summary)
 
 
-def analyze_dataframe(schema: Dict[str, Any], summary: Dict[str, Any], use_openai: bool = False) -> List[Dict[str, Any]]:
+def analyze_dataframe(schema: Dict[str, Any], summary: Dict[str, Any], use_claude: bool = False) -> List[Dict[str, Any]]:
     """
     Función principal para analizar un DataFrame y generar sugerencias de visualización.
     
     Args:
         schema: Información del esquema del DataFrame
         summary: Estadísticas descriptivas
-        use_openai: Si True, usa OpenAI API; si False, usa mock
+        use_claude: Si True, usa API de IA (Claude); si False, usa mock
         
     Returns:
         Lista de sugerencias de visualización
     """
-    if use_openai:
-        return analyze_dataframe_openai(schema, summary)
+    if use_claude:
+        return analyze_dataframe_claude(schema, summary)
     else:
         return analyze_dataframe_mock(schema, summary)

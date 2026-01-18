@@ -89,9 +89,9 @@ async def upload_file(file: UploadFile = File(...)):
             'info': metadata['info']
         }
         
-        # Usar OpenAI si está configurado, sino usar mock
-        use_openai = os.getenv('OPENAI_API_KEY') is not None
-        ai_suggestions = analyze_dataframe(schema, summary, use_openai=use_openai)
+        # Usar IA si está configurado, sino usar mock
+        use_ai = os.getenv('AI_API_KEY') is not None
+        ai_suggestions = analyze_dataframe(schema, summary, use_claude=use_ai)
         
         # Convertir a modelos Pydantic
         suggestions = [

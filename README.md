@@ -5,7 +5,7 @@ Backend API para la aplicación de creación de dashboards con IA. Este backend 
 ## 🚀 Características
 
 - **Procesamiento de archivos**: Soporta archivos .xlsx, .xls y .csv usando pandas
-- **Análisis con IA**: Analiza datos y genera sugerencias de visualización (mock o OpenAI)
+- **Análisis con IA**: Analiza datos y genera sugerencias de visualización (mock o Claude)
 - **API RESTful**: Endpoints para subir archivos y obtener datos de gráficos
 - **CORS configurado**: Listo para trabajar con el frontend React
 
@@ -36,10 +36,18 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-4. Configura las variables de entorno (opcional):
+4. Configura las variables de entorno:
 ```bash
-cp .env.example .env
-# Edita .env y agrega tu OPENAI_API_KEY si quieres usar la API real
+# Para desarrollo: copia el archivo de ejemplo y agrega tu API key
+cp env.development.example .env.development
+# Edita .env.development y agrega tu AI_API_KEY
+
+# Para producción: copia el archivo de ejemplo y agrega tu API key
+cp env.production.example .env.production
+# Edita .env.production y agrega tu AI_API_KEY
+
+# O crea un archivo .env simple en la raíz del proyecto
+# con AI_API_KEY=tu_clave_aqui
 ```
 
 ## 🚀 Ejecución
@@ -137,16 +145,18 @@ Obtiene datos agregados para un gráfico específico
 
 ### Variables de Entorno (.env)
 
-- `OPENAI_API_KEY`: Tu clave de API de OpenAI (opcional, usa mock si no está configurada)
+- `AI_API_KEY`: Tu clave de API de IA (Claude, OpenAI, etc.) (opcional, usa mock si no está configurada)
 - `BACKEND_PORT`: Puerto del servidor (default: 8000)
-- `CORS_ORIGINS`: Orígenes permitidos para CORS (separados por comas)
+- `ENVIRONMENT`: Entorno de ejecución (development/production)
 
 ## 🧪 Modo Mock vs Real
 
-Por defecto, la aplicación usa un analizador mock que genera sugerencias inteligentes basadas en la estructura de los datos. Para usar la API real de OpenAI:
+Por defecto, la aplicación usa un analizador mock que genera sugerencias inteligentes basadas en la estructura de los datos. Para usar la API real de IA (actualmente Claude):
 
-1. Obtén una clave de API de OpenAI
-2. Agrega `OPENAI_API_KEY=tu_clave_aqui` al archivo `.env`
+1. Obtén una clave de API según el proveedor que uses:
+   - Claude: https://console.anthropic.com/
+   - OpenAI: https://platform.openai.com/api-keys
+2. Agrega `AI_API_KEY=tu_clave_aqui` al archivo `.env` o `.env.development`/`.env.production`
 3. Reinicia el servidor backend
 
 ## 🏗️ Estructura del Proyecto
@@ -168,7 +178,7 @@ maic-BACKEND-bi-ai-powered-dashboard/
 
 - **FastAPI**: Framework web moderno y rápido
 - **Pandas**: Procesamiento y análisis de datos
-- **OpenAI**: Integración con modelos de lenguaje (opcional)
+- **Anthropic (Claude)**: Integración con modelos de lenguaje (opcional)
 - **Pydantic**: Validación de datos
 - **Uvicorn**: Servidor ASGI
 
