@@ -24,6 +24,7 @@ origins = [
     "http://localhost:3000",   # React default
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
+    "https://bi-dashboard-vert.vercel.app/"
 ]
 
 app.add_middleware(
