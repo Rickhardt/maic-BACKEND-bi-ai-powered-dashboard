@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
@@ -25,21 +25,54 @@ from services.ai_analyzer import analyze_dataframe, ANTHROPIC_AVAILABLE
 app = FastAPI(title="Dashboard Creator API", version="1.0.0")
 
 # Configurar CORS
-origins = [
-    "http://localhost:5173",  # Vite default
-    "http://localhost:3000",   # React default
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:3000",
-    "https://bi-dashboard-vert.vercel.app/"
-]
+# Obtener origen permitido desde variable de entorno o usar lista por defecto
+allowed_origins_env = os.getenv('ALLOWED_ORIGINS', '')
+if allowed_origins_env:
+    # Si hay variable de entorno, dividir por comas
+    origins = [origin.strip() for origin in allowed_origins_env.split(',')]
+else:
+    # Lista por defecto
+    origins = [
+        "http://localhost:5173",  # Vite default
+        "http://localhost:3000",   # React default
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+        "https://bi-dashboard-vert.vercel.app",  # Sin barra al final
+        "https://bi-dashboard-vert.vercel.app/",  # Con barra (por si acaso)
+    ]
+
+# Agregar logging para debugging
+logger.info(f"CORS configurado con orígenes permitidos: {origins}")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],  # Exponer todos los headers en la respuesta
 )
+
+# Middleware personalizado para logging de CORS (solo para debugging)
+@app.middleware("http")
+async def cors_logging_middleware(request: Request, call_next):
+    origin = request.headers.get("origin")
+    if origin:
+        logger.info(f"Request desde origen: {origin}")
+        if origin not in origins:
+            logger.warning(f"Origen no permitido: {origin}. Orígenes permitidos: {origins}")
+    
+    response = await call_next(request)
+    
+    # Log de headers CORS en la respuesta
+    cors_headers = {
+        "access-control-allow-origin": response.headers.get("access-control-allow-origin"),
+        "access-control-allow-credentials": response.headers.get("access-control-allow-credentials"),
+        "access-control-allow-methods": response.headers.get("access-control-allow-methods"),
+    }
+    logger.debug(f"Headers CORS en respuesta: {cors_headers}")
+    
+    return response
 
 # Almacenar DataFrames en memoria (en producción usar cache/DB)
 dataframes_cache: dict[str, any] = {}
@@ -53,6 +86,40 @@ async def root():
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/api/cors-info")
+async def cors_info(request: Request):
+    """
+    Endpoint para debuggear problemas de CORS.
+    Muestra información sobre el origen de la petición y la configuración CORS.
+    """
+    origin = request.headers.get("origin")
+    referer = request.headers.get("referer")
+    
+    allowed_origins_env = os.getenv('ALLOWED_ORIGINS', '')
+    if allowed_origins_env:
+        configured_origins = [origin.strip() for origin in allowed_origins_env.split(',')]
+    else:
+        configured_origins = [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000",
+            "https://bi-dashboard-vert.vercel.app",
+            "https://bi-dashboard-vert.vercel.app/",
+        ]
+    
+    is_allowed = origin in configured_origins if origin else False
+    
+    return {
+        "origin_header": origin,
+        "referer_header": referer,
+        "configured_origins": configured_origins,
+        "is_origin_allowed": is_allowed,
+        "all_headers": dict(request.headers),
+        "message": "Revisa si el origen está en la lista de orígenes permitidos"
+    }
 
 
 @app.get("/api/test-anthropic")
