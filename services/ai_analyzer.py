@@ -102,6 +102,55 @@ def analyze_dataframe_mock(schema: Dict[str, Any], summary: Dict[str, Any]) -> L
             'insight': f'Visualiza la distribución de valores de {num_col} en el dataset. Ayuda a identificar valores atípicos y entender la dispersión de los datos.'
         })
     
+    # Sugerencias para cuando solo hay columnas categóricas
+    if categorical_cols and not numeric_cols:
+        # Sugerencia: Conteo de frecuencias de la primera columna categórica
+        if len(categorical_cols) >= 1:
+            cat_col = categorical_cols[0]
+            suggestions.append({
+                'title': f'Frecuencia de {cat_col}',
+                'chart_type': 'bar',
+                'parameters': {
+                    'x_axis': cat_col,
+                    'y_axis': 'count',
+                    'group_by': cat_col,
+                    'aggregate': 'count'
+                },
+                'insight': f'Este gráfico muestra la frecuencia de cada valor único en {cat_col}. Útil para identificar los valores más comunes y la distribución de categorías.'
+            })
+        
+        # Sugerencia: Relación entre dos columnas categóricas (conteo cruzado)
+        if len(categorical_cols) >= 2:
+            cat_col1 = categorical_cols[0]
+            cat_col2 = categorical_cols[1]
+            suggestions.append({
+                'title': f'Distribución de {cat_col1} por {cat_col2}',
+                'chart_type': 'bar',
+                'parameters': {
+                    'x_axis': cat_col1,
+                    'y_axis': 'count',
+                    'group_by': cat_col1,
+                    'aggregate': 'count',
+                    'category': cat_col2
+                },
+                'insight': f'Este gráfico muestra cómo se distribuyen los valores de {cat_col1} en relación con {cat_col2}. Ayuda a identificar patrones y relaciones entre categorías.'
+            })
+        
+        # Sugerencia: Gráfico de pie con frecuencias
+        if len(categorical_cols) >= 1:
+            cat_col = categorical_cols[0]
+            suggestions.append({
+                'title': f'Proporción de {cat_col}',
+                'chart_type': 'pie',
+                'parameters': {
+                    'category': cat_col,
+                    'value': 'count',
+                    'group_by': cat_col,
+                    'aggregate': 'count'
+                },
+                'insight': f'Este gráfico circular muestra la proporción relativa de cada valor en {cat_col}. Perfecto para visualizar la distribución porcentual de categorías.'
+            })
+    
     # Limitar a máximo 5 sugerencias
     return suggestions[:5]
 

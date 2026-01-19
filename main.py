@@ -5,6 +5,12 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Optional
+import traceback
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 from models.schemas import (
     UploadResponse,
@@ -63,9 +69,15 @@ async def upload_file(file: UploadFile = File(...)):
         )
     
     # Guardar archivo temporalmente
+    tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
             content = await file.read()
+            if not content or len(content) == 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El archivo está vacío"
+                )
             tmp_file.write(content)
             tmp_path = tmp_file.name
         
@@ -94,10 +106,28 @@ async def upload_file(file: UploadFile = File(...)):
         use_ai = os.getenv('AI_API_KEY') is not None
         ai_suggestions = analyze_dataframe(schema, summary, use_claude=use_ai)
         
-        # Convertir a modelos Pydantic
-        suggestions = [
-            ChartSuggestion(**suggestion) for suggestion in ai_suggestions
-        ]
+        # Validar y convertir a modelos Pydantic
+        suggestions = []
+        for suggestion in ai_suggestions:
+            try:
+                # Asegurar que todos los campos requeridos estén presentes
+                if 'title' not in suggestion:
+                    suggestion['title'] = 'Gráfico sin título'
+                if 'chart_type' not in suggestion:
+                    suggestion['chart_type'] = 'bar'
+                if 'parameters' not in suggestion:
+                    suggestion['parameters'] = {}
+                if 'insight' not in suggestion:
+                    suggestion['insight'] = 'Análisis de datos'
+                
+                # Convertir parameters a ChartParameters si es dict
+                if isinstance(suggestion['parameters'], dict):
+                    suggestion['parameters'] = ChartParameters(**suggestion['parameters'])
+                
+                suggestions.append(ChartSuggestion(**suggestion))
+            except Exception as e:
+                logger.warning(f"Error al procesar sugerencia: {str(e)}. Sugerencia: {suggestion}")
+                continue
         
         # Limpiar archivo temporal
         os.unlink(tmp_path)
@@ -118,7 +148,14 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         # Limpiar archivo temporal en caso de error
         if 'tmp_path' in locals() and os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
+        
+        # Log del error completo para debugging
+        error_trace = traceback.format_exc()
+        logger.error(f"Error al procesar archivo: {str(e)}\n{error_trace}")
         
         raise HTTPException(
             status_code=500,

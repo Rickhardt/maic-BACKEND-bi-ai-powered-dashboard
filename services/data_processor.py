@@ -18,11 +18,35 @@ def process_file(file_path: str) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     
     # Leer archivo según extensión
     if file_extension == '.csv':
-        df = pd.read_csv(file_path, encoding='utf-8')
+        # Intentar múltiples codificaciones comunes
+        encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252', 'utf-8-sig']
+        df = None
+        last_error = None
+        
+        for encoding in encodings:
+            try:
+                df = pd.read_csv(file_path, encoding=encoding, on_bad_lines='skip')
+                break
+            except UnicodeDecodeError as e:
+                last_error = e
+                continue
+            except Exception as e:
+                last_error = e
+                continue
+        
+        if df is None:
+            raise ValueError(f"Error al leer archivo CSV. Último error: {str(last_error)}")
     elif file_extension in ['.xlsx', '.xls']:
         df = pd.read_excel(file_path, engine='openpyxl')
     else:
         raise ValueError(f"Formato de archivo no soportado: {file_extension}")
+    
+    # Validar que el DataFrame no esté vacío
+    if df.empty:
+        raise ValueError("El archivo está vacío o no contiene datos válidos")
+    
+    # Limpiar nombres de columnas (eliminar espacios y caracteres especiales)
+    df.columns = df.columns.str.strip()
     
     # Extraer metadatos
     metadata = {
@@ -78,8 +102,26 @@ def get_chart_data(
     try:
         if chart_type == 'bar' or chart_type == 'line':
             if x_axis and y_axis:
+                # Si y_axis es 'count', hacer conteo de frecuencias
+                if y_axis == 'count' and group_by:
+                    counts = df.groupby(group_by).size()
+                    result['data'] = [
+                        {'name': str(name), 'value': float(val)}
+                        for name, val in counts.items()
+                    ]
+                    result['labels'] = [str(name) for name in counts.index]
+                # Si hay una columna category adicional, hacer conteo cruzado
+                elif y_axis == 'count' and category and group_by:
+                    counts = df.groupby([group_by, category]).size().reset_index(name='count')
+                    # Agrupar por group_by y sumar conteos
+                    aggregated = counts.groupby(group_by)['count'].sum()
+                    result['data'] = [
+                        {'name': str(name), 'value': float(val)}
+                        for name, val in aggregated.items()
+                    ]
+                    result['labels'] = [str(name) for name in aggregated.index]
                 # Agrupar y agregar si es necesario
-                if group_by:
+                elif group_by:
                     grouped = df.groupby(group_by)[y_axis]
                     if aggregate == 'sum':
                         aggregated = grouped.sum()
@@ -105,22 +147,38 @@ def get_chart_data(
         
         elif chart_type == 'pie':
             if category and value:
-                if group_by:
+                # Si value es 'count', hacer conteo de frecuencias
+                if value == 'count' and group_by:
+                    counts = df.groupby(group_by).size()
+                    result['data'] = [
+                        {'name': str(name), 'value': float(val)}
+                        for name, val in counts.items()
+                    ]
+                    result['labels'] = [str(name) for name in counts.index]
+                elif group_by:
                     grouped = df.groupby(group_by)[value]
                     if aggregate == 'sum':
                         aggregated = grouped.sum()
                     elif aggregate == 'mean':
                         aggregated = grouped.mean()
+                    elif aggregate == 'count':
+                        aggregated = grouped.count()
                     else:
                         aggregated = grouped.sum()
+                    
+                    result['data'] = [
+                        {'name': str(name), 'value': float(val)}
+                        for name, val in aggregated.items()
+                    ]
+                    result['labels'] = [str(name) for name in aggregated.index]
                 else:
                     aggregated = df.groupby(category)[value].sum()
-                
-                result['data'] = [
-                    {'name': str(name), 'value': float(val)}
-                    for name, val in aggregated.items()
-                ]
-                result['labels'] = [str(name) for name in aggregated.index]
+                    
+                    result['data'] = [
+                        {'name': str(name), 'value': float(val)}
+                        for name, val in aggregated.items()
+                    ]
+                    result['labels'] = [str(name) for name in aggregated.index]
         
         elif chart_type == 'scatter':
             if x_axis and y_axis:
