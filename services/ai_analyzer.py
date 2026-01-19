@@ -1,7 +1,11 @@
 import json
 from typing import Dict, Any, List
 import os
+import logging
 from dotenv import load_dotenv
+
+# Configurar logging
+logger = logging.getLogger(__name__)
 
 # Cargar variables de entorno
 load_dotenv()
@@ -171,10 +175,22 @@ def analyze_dataframe_claude(schema: Dict[str, Any], summary: Dict[str, Any]) ->
     
     api_key = os.getenv('AI_API_KEY')
     if not api_key:
-        print("Warning: AI_API_KEY not found, using mock analyzer")
+        logger.info("AI_API_KEY not found, using mock analyzer")
         return analyze_dataframe_mock(schema, summary)
     
-    client = Anthropic(api_key=api_key)
+    # Intentar inicializar el cliente de Anthropic
+    try:
+        # Intentar inicializar sin argumentos adicionales que puedan causar problemas
+        client = Anthropic(api_key=api_key)
+    except TypeError as e:
+        # Capturar específicamente errores de argumentos inesperados
+        logger.warning(f"Error de tipo al inicializar cliente Anthropic (posible incompatibilidad de versión): {e}")
+        logger.warning("Falling back to mock analyzer")
+        return analyze_dataframe_mock(schema, summary)
+    except Exception as e:
+        logger.warning(f"Error al inicializar cliente Anthropic: {e}")
+        logger.warning("Falling back to mock analyzer")
+        return analyze_dataframe_mock(schema, summary)
     
     prompt = f"""Eres un analista de datos experto. Analiza la siguiente información de un DataFrame y sugiere 3-5 visualizaciones específicas y útiles.
 
@@ -232,8 +248,8 @@ Responde solo con el JSON, sin texto adicional:"""
         return suggestions if isinstance(suggestions, list) else []
     
     except Exception as e:
-        print(f"Error calling Claude API: {e}")
-        print("Falling back to mock analyzer")
+        logger.error(f"Error calling Claude API: {e}")
+        logger.info("Falling back to mock analyzer")
         return analyze_dataframe_mock(schema, summary)
 
 

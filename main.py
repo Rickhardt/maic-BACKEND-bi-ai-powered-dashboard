@@ -20,7 +20,7 @@ from models.schemas import (
     ChartParameters
 )
 from services.data_processor import process_file, get_chart_data
-from services.ai_analyzer import analyze_dataframe
+from services.ai_analyzer import analyze_dataframe, ANTHROPIC_AVAILABLE
 
 app = FastAPI(title="Dashboard Creator API", version="1.0.0")
 
@@ -53,6 +53,72 @@ async def root():
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/api/test-anthropic")
+async def test_anthropic():
+    """
+    Endpoint de prueba para verificar la inicialización del cliente de Anthropic.
+    Útil para diagnosticar problemas con la API de Claude.
+    """
+    result = {
+        "anthropic_available": ANTHROPIC_AVAILABLE,
+        "api_key_configured": os.getenv('AI_API_KEY') is not None,
+        "api_key_length": len(os.getenv('AI_API_KEY', '')) if os.getenv('AI_API_KEY') else 0,
+        "client_initialization": "not_attempted",
+        "error": None,
+        "error_type": None,
+        "error_details": None
+    }
+    
+    if not ANTHROPIC_AVAILABLE:
+        result["error"] = "Biblioteca anthropic no está disponible (no se pudo importar)"
+        result["error_type"] = "ImportError"
+        return result
+    
+    if not os.getenv('AI_API_KEY'):
+        result["error"] = "AI_API_KEY no está configurada en las variables de entorno"
+        result["error_type"] = "ConfigurationError"
+        return result
+    
+    # Intentar inicializar el cliente
+    try:
+        from anthropic import Anthropic
+        api_key = os.getenv('AI_API_KEY')
+        
+        try:
+            client = Anthropic(api_key=api_key)
+            result["client_initialization"] = "success"
+            
+            # Intentar hacer una llamada de prueba muy simple (solo verificar que el cliente funciona)
+            # No hacemos una llamada real para no consumir tokens
+            result["status"] = "ready"
+            result["message"] = "Cliente de Anthropic inicializado correctamente"
+            
+        except TypeError as e:
+            result["client_initialization"] = "failed"
+            result["error"] = str(e)
+            result["error_type"] = "TypeError"
+            result["error_details"] = traceback.format_exc()
+            result["status"] = "error"
+            result["message"] = "Error al inicializar cliente (posible incompatibilidad de versión)"
+            
+        except Exception as e:
+            result["client_initialization"] = "failed"
+            result["error"] = str(e)
+            result["error_type"] = type(e).__name__
+            result["error_details"] = traceback.format_exc()
+            result["status"] = "error"
+            result["message"] = f"Error inesperado: {str(e)}"
+            
+    except Exception as e:
+        result["error"] = str(e)
+        result["error_type"] = type(e).__name__
+        result["error_details"] = traceback.format_exc()
+        result["status"] = "error"
+        result["message"] = f"Error al importar o inicializar: {str(e)}"
+    
+    return result
 
 
 @app.post("/api/upload", response_model=UploadResponse)
