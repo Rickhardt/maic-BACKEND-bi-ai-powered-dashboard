@@ -2,6 +2,7 @@ import json
 from typing import Dict, Any, List
 import os
 import logging
+import traceback
 from dotenv import load_dotenv
 
 # Configurar logging
@@ -171,6 +172,7 @@ def analyze_dataframe_claude(schema: Dict[str, Any], summary: Dict[str, Any]) ->
         Lista de sugerencias de visualización
     """
     if not ANTHROPIC_AVAILABLE:
+        logger.info("Anthropic library not available, using mock analyzer")
         return analyze_dataframe_mock(schema, summary)
     
     api_key = os.getenv('AI_API_KEY')
@@ -180,15 +182,17 @@ def analyze_dataframe_claude(schema: Dict[str, Any], summary: Dict[str, Any]) ->
     
     # Intentar inicializar el cliente de Anthropic
     try:
-        # Intentar inicializar sin argumentos adicionales que puedan causar problemas
         client = Anthropic(api_key=api_key)
+        logger.info("Anthropic client initialized successfully")
     except TypeError as e:
         # Capturar específicamente errores de argumentos inesperados
         logger.warning(f"Error de tipo al inicializar cliente Anthropic (posible incompatibilidad de versión): {e}")
+        logger.warning(f"Full traceback: {traceback.format_exc()}")
         logger.warning("Falling back to mock analyzer")
         return analyze_dataframe_mock(schema, summary)
     except Exception as e:
         logger.warning(f"Error al inicializar cliente Anthropic: {e}")
+        logger.warning(f"Full traceback: {traceback.format_exc()}")
         logger.warning("Falling back to mock analyzer")
         return analyze_dataframe_mock(schema, summary)
     
@@ -234,8 +238,9 @@ Ejemplo de formato:
 Responde solo con el JSON, sin texto adicional:"""
 
     try:
+        logger.info("Calling Claude API for data analysis...")
         message = client.messages.create(
-            model="claude-4-5-sonnet-20241022",
+            model="claude-sonnet-4-5-20250929",  # ✅ FIXED: Updated to correct model name
             max_tokens=1500,
             temperature=0.7,
             system="Eres un experto analista de datos que genera sugerencias de visualización en formato JSON.",
@@ -243,6 +248,8 @@ Responde solo con el JSON, sin texto adicional:"""
                 {"role": "user", "content": prompt}
             ]
         )
+        
+        logger.info("Claude API call successful")
         
         content = message.content[0].text.strip()
         # Limpiar el contenido si tiene markdown code blocks
@@ -255,10 +262,20 @@ Responde solo con el JSON, sin texto adicional:"""
         content = content.strip()
         
         suggestions = json.loads(content)
+        logger.info(f"Successfully parsed {len(suggestions)} suggestions from Claude")
         return suggestions if isinstance(suggestions, list) else []
+    
+    except json.JSONDecodeError as e:
+        logger.error(f"Error parsing JSON from Claude API response: {e}")
+        logger.error(f"Response content: {content if 'content' in locals() else 'N/A'}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        logger.info("Falling back to mock analyzer")
+        return analyze_dataframe_mock(schema, summary)
     
     except Exception as e:
         logger.error(f"Error calling Claude API: {e}")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         logger.info("Falling back to mock analyzer")
         return analyze_dataframe_mock(schema, summary)
 
@@ -276,6 +293,8 @@ def analyze_dataframe(schema: Dict[str, Any], summary: Dict[str, Any], use_claud
         Lista de sugerencias de visualización
     """
     if use_claude:
+        logger.info("Using Claude AI analyzer")
         return analyze_dataframe_claude(schema, summary)
     else:
+        logger.info("Using mock analyzer")
         return analyze_dataframe_mock(schema, summary)
