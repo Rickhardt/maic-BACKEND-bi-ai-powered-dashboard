@@ -196,34 +196,24 @@ def analyze_dataframe_claude(schema: Dict[str, Any], summary: Dict[str, Any]) ->
         logger.warning("Falling back to mock analyzer")
         return analyze_dataframe_mock(schema, summary)
     
-    prompt = f"""Eres un analista de datos experto. Analiza la siguiente información de un DataFrame y sugiere 3-5 visualizaciones específicas y útiles.
+    prompt = f"""Eres un analista de datos experto. Analiza la siguiente información de un DataFrame y sugiere 3-5 visualizaciones útiles.
 
 Información del DataFrame:
 - Columnas: {schema.get('columns', [])}
 - Tipos de datos: {schema.get('dtypes', {})}
 - Forma: {schema.get('shape', (0, 0))}
-- Estadísticas descriptivas: {json.dumps(summary.get('summary_stats', {}), indent=2)}
+- Estadísticas: {json.dumps(summary.get('summary_stats', {}), indent=2)}
 
-Para cada visualización sugerida, debes proporcionar:
-1. Un título claro que indique QUÉ se está graficando
-2. El tipo de gráfico más apropiado para mostrar la información
-3. Los parámetros necesarios para construir el gráfico
-4. Una explicación detallada que incluya:
-   - QUÉ información se está visualizando (qué representa cada eje, cada categoría, cada valor)
-   - QUÉ SIGNIFICA la información en términos prácticos y de negocio
-   - Qué PATRONES o INSIGHTS se pueden observar
-   - Cómo INTERPRETAR los datos mostrados
-
-Responde ÚNICAMENTE con un JSON válido que contenga un array de objetos. Cada objeto debe tener exactamente estas claves:
-- title: string (título descriptivo que indique QUÉ se está graficando, ej: "Frecuencia de Planes de Proceso por Nombre")
+Responde ÚNICAMENTE con un JSON válido (sin markdown, sin texto adicional). Array de objetos con:
+- title: string (título descriptivo, ej: "Frecuencia de Planes por Nombre")
 - chart_type: string (uno de: "bar", "line", "pie", "scatter")
-- parameters: object con claves como x_axis, y_axis, category, value, group_by, aggregate
-- insight: string (explicación detallada de 3-4 oraciones que explique: 1) QUÉ se está visualizando y qué representa cada elemento del gráfico, 2) QUÉ SIGNIFICA la información en términos prácticos, 3) Qué patrones o insights se pueden observar, 4) Cómo interpretar los datos)
+- parameters: object (x_axis, y_axis, category, value, group_by, aggregate según corresponda)
+- insight: string (2-3 oraciones explicando: qué visualiza, qué significa, qué patrones revela)
 
-Ejemplo de formato:
+Ejemplo:
 [
   {{
-    "title": "Frecuencia de Planes de Proceso por Nombre",
+    "title": "Frecuencia de Planes de Proceso",
     "chart_type": "bar",
     "parameters": {{
       "x_axis": "PROCESSPLANNAME",
@@ -231,17 +221,17 @@ Ejemplo de formato:
       "group_by": "PROCESSPLANNAME",
       "aggregate": "count"
     }},
-    "insight": "Este gráfico visualiza la frecuencia de aparición de cada plan de proceso en el dataset, donde el eje X muestra los nombres de los planes de proceso (PROCESSPLANNAME) y el eje Y representa el número de veces que cada plan aparece en los datos. Esta visualización te permite identificar qué planes de proceso son los más comunes o utilizados con mayor frecuencia en tu operación. Los valores más altos indican planes que se ejecutan repetidamente, mientras que los valores bajos muestran planes menos frecuentes. Esta información es útil para identificar procesos críticos que requieren mayor atención o para optimizar la asignación de recursos basándose en la frecuencia de uso."
+    "insight": "Muestra la frecuencia de cada plan de proceso. Los valores altos indican planes ejecutados repetidamente. Útil para identificar procesos críticos y optimizar recursos."
   }}
 ]
 
-Responde solo con el JSON, sin texto adicional:"""
+Genera el JSON ahora:"""
 
     try:
         logger.info("Calling Claude API for data analysis...")
         message = client.messages.create(
-            model="claude-sonnet-4-5-20250929",  # ✅ FIXED: Updated to correct model name
-            max_tokens=1500,
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=4096,
             temperature=0.7,
             system="Eres un experto analista de datos que genera sugerencias de visualización en formato JSON.",
             messages=[
