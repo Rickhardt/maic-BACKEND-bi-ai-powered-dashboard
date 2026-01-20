@@ -200,24 +200,34 @@ Información del DataFrame:
 - Forma: {schema.get('shape', (0, 0))}
 - Estadísticas descriptivas: {json.dumps(summary.get('summary_stats', {}), indent=2)}
 
+Para cada visualización sugerida, debes proporcionar:
+1. Un título claro que indique QUÉ se está graficando
+2. El tipo de gráfico más apropiado para mostrar la información
+3. Los parámetros necesarios para construir el gráfico
+4. Una explicación detallada que incluya:
+   - QUÉ información se está visualizando (qué representa cada eje, cada categoría, cada valor)
+   - QUÉ SIGNIFICA la información en términos prácticos y de negocio
+   - Qué PATRONES o INSIGHTS se pueden observar
+   - Cómo INTERPRETAR los datos mostrados
+
 Responde ÚNICAMENTE con un JSON válido que contenga un array de objetos. Cada objeto debe tener exactamente estas claves:
-- title: string (título descriptivo del gráfico)
+- title: string (título descriptivo que indique QUÉ se está graficando, ej: "Frecuencia de Planes de Proceso por Nombre")
 - chart_type: string (uno de: "bar", "line", "pie", "scatter")
 - parameters: object con claves como x_axis, y_axis, category, value, group_by, aggregate
-- insight: string (análisis breve de 1-2 oraciones explicando qué revela este gráfico)
+- insight: string (explicación detallada de 3-4 oraciones que explique: 1) QUÉ se está visualizando y qué representa cada elemento del gráfico, 2) QUÉ SIGNIFICA la información en términos prácticos, 3) Qué patrones o insights se pueden observar, 4) Cómo interpretar los datos)
 
 Ejemplo de formato:
 [
   {{
-    "title": "Distribución de Ventas por Región",
+    "title": "Frecuencia de Planes de Proceso por Nombre",
     "chart_type": "bar",
     "parameters": {{
-      "x_axis": "Región",
-      "y_axis": "Ventas",
-      "group_by": "Región",
-      "aggregate": "sum"
+      "x_axis": "PROCESSPLANNAME",
+      "y_axis": "count",
+      "group_by": "PROCESSPLANNAME",
+      "aggregate": "count"
     }},
-    "insight": "Este gráfico revela que la región 'Norte' tiene el mayor rendimiento en ventas."
+    "insight": "Este gráfico visualiza la frecuencia de aparición de cada plan de proceso en el dataset, donde el eje X muestra los nombres de los planes de proceso (PROCESSPLANNAME) y el eje Y representa el número de veces que cada plan aparece en los datos. Esta visualización te permite identificar qué planes de proceso son los más comunes o utilizados con mayor frecuencia en tu operación. Los valores más altos indican planes que se ejecutan repetidamente, mientras que los valores bajos muestran planes menos frecuentes. Esta información es útil para identificar procesos críticos que requieren mayor atención o para optimizar la asignación de recursos basándose en la frecuencia de uso."
   }}
 ]
 
