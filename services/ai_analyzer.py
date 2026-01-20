@@ -235,7 +235,7 @@ Responde solo con el JSON, sin texto adicional:"""
 
     try:
         message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-4-5-sonnet-20241022",
             max_tokens=1500,
             temperature=0.7,
             system="Eres un experto analista de datos que genera sugerencias de visualización en formato JSON.",
